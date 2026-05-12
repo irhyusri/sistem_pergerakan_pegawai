@@ -3,146 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Pergerakan Pegawai - Bahagian Kejuruteraan Negeri</title>
+    <title>Sistem Pergerakan Pegawai (Cloud Version)</title>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc, getDoc } 
+        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // --- GANTIKAN DENGAN FIREBASE CONFIG ANDA DI SINI ---
+        const firebaseConfig = {
+  apiKey: "AIzaSyA3m4GL0Nke7spCwDm8GcZDo1yoYGLKbtc",
+  authDomain: "sistem-rekod-fail.firebaseapp.com",
+  projectId: "sistem-rekod-fail",
+  storageBucket: "sistem-rekod-fail.firebasestorage.app",
+  messagingSenderId: "543329165251",
+  appId: "1:543329165251:web:0bb357cc5a31e7065de776",
+  measurementId: "G-YBKTH94T4B"
+};
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const colRef = collection(db, "pergerakan");
+
+        // UI Elements
+        const form = document.getElementById('movementForm');
+        const tableBody = document.getElementById('tableBody');
+        const submitBtn = document.getElementById('submitBtn');
+        const editIdInput = document.getElementById('editId');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+
+        // 1. PAPAR DATA (Real-time)
+        const q = query(colRef);
+        onSnapshot(q, (snapshot) => {
+            let records = [];
+            snapshot.docs.forEach(doc => records.push({ ...doc.data(), id: doc.id }));
+            
+            // Susun secara manual mengikut Nama Pegawai
+            records.sort((a, b) => a.nama.localeCompare(b.nama) || new Date(a.keluar) - new Date(b.keluar));
+            
+            renderTable(records);
+        });
+
+        function renderTable(data) {
+            tableBody.innerHTML = '';
+            data.forEach(rec => {
+                const infoLokasi = rec.lokasi ? `<span class="lokasi-text">📍 ${rec.lokasi}</span>` : '';
+                tableBody.innerHTML += `
+                    <tr>
+                        <td><strong>${rec.nama}</strong><br><small style="color:#666">${rec.unit}</small></td>
+                        <td><span class="badge bg-${rec.tujuan.toLowerCase()}">${rec.tujuan}</span>${infoLokasi}</td>
+                        <td>${formatDate(rec.keluar)} (${rec.tempoh})</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn-edit" data-id="${rec.id}">Edit</button>
+                                <button class="btn-delete" data-id="${rec.id}">Padam</button>
+                            </div>
+                        </td>
+                    </tr>`;
+            });
+
+            // Re-attach event listeners for edit/delete
+            document.querySelectorAll('.btn-edit').forEach(btn => btn.onclick = () => editRecord(btn.dataset.id));
+            document.querySelectorAll('.btn-delete').forEach(btn => btn.onclick = () => deleteRecord(btn.dataset.id));
+        }
+
+        // 2. SIMPAN / UPDATE DATA
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const recordData = {
+                nama: document.getElementById('namaSelect').value,
+                unit: document.getElementById('unitSelect').value,
+                tujuan: document.getElementById('tujuan').value,
+                lokasi: document.getElementById('lokasi').value,
+                keluar: document.getElementById('tarikhKeluar').value,
+                tempoh: document.getElementById('tempoh').value,
+                timestamp: new Date()
+            };
+
+            try {
+                if (editIdInput.value) {
+                    const docRef = doc(db, "pergerakan", editIdInput.value);
+                    await updateDoc(docRef, recordData);
+                    alert("Rekod dikemaskini!");
+                } else {
+                    await addDoc(colRef, recordData);
+                    alert("Rekod disimpan!");
+                }
+                cancelEdit();
+            } catch (err) {
+                console.error("Error: ", err);
+            }
+        };
+
+        // 3. DELETE
+        window.deleteRecord = async (id) => {
+            if(confirm('Padam rekod ini?')) {
+                await deleteDoc(doc(db, "pergerakan", id));
+            }
+        };
+
+        // 4. EDIT
+        window.editRecord = async (id) => {
+            const docSnap = await getDoc(doc(db, "pergerakan", id));
+            if (docSnap.exists()) {
+                const rec = docSnap.data();
+                editIdInput.value = id;
+                document.getElementById('namaSelect').value = rec.nama;
+                document.getElementById('unitSelect').value = rec.unit;
+                document.getElementById('tujuan').value = rec.tujuan;
+                toggleLokasi();
+                document.getElementById('lokasi').value = rec.lokasi;
+                document.getElementById('tarikhKeluar').value = rec.keluar;
+                document.getElementById('tempoh').value = rec.tempoh;
+
+                submitBtn.textContent = "Kemaskini Rekod";
+                submitBtn.classList.add('btn-update');
+                cancelEditBtn.style.display = "block";
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        };
+
+        window.cancelEdit = () => {
+            form.reset();
+            editIdInput.value = "";
+            submitBtn.textContent = "Simpan Rekod Pergerakan";
+            submitBtn.classList.remove('btn-update');
+            cancelEditBtn.style.display = "none";
+            toggleLokasi();
+        };
+
+        // Helper: Format Date
+        function formatDate(dateString) {
+            if(!dateString) return "";
+            const [y, m, d] = dateString.split('-');
+            return `${d}/${m}/${y}`;
+        }
+    </script>
+
     <style>
-        :root {
-            --primary: #2c3e50;
-            --secondary: #34495e;
-            --accent: #3498db;
-            --success: #27ae60;
-            --danger: #e74c3c;
-            --light: #f4f7f6;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--light);
-            margin: 0;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1100px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-
-        h2 {
-            color: var(--primary);
-            text-align: center;
-            border-bottom: 2px solid var(--accent);
-            padding-bottom: 10px;
-        }
-
-        .form-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: var(--secondary);
-        }
-
-        select, input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-            font-size: 14px;
-        }
-
-        #lokasiWrapper {
-            grid-column: span 2;
-            background: #f9f9f9;
-            padding: 10px;
-            border-left: 4px solid var(--accent);
-            display: none;
-            margin-bottom: 15px;
-        }
-
-        .btn-main {
-            width: 100%;
-            padding: 12px;
-            background-color: var(--accent);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-
+        /* Gaya CSS Kekal Sama Seperti Sebelum Ini */
+        :root { --primary: #2c3e50; --secondary: #34495e; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --light: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--light); padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+        .form-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        select, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; }
+        #lokasiWrapper { grid-column: span 2; background: #f9f9f9; padding: 10px; border-left: 4px solid var(--accent); display: none; margin-bottom: 15px; }
+        .btn-main { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 10px; }
         .btn-update { background-color: var(--success); }
-
-        hr { margin: 30px 0; border: 0; border-top: 1px solid #eee; }
-
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
-
-        th { background-color: var(--primary); color: white; }
-
-        tr:hover { background-color: #f1f1f1; }
-
+        th { background: var(--primary); color: white; }
         .action-btns { display: flex; gap: 5px; }
-
-        .btn-edit {
-            background-color: var(--success);
-            padding: 6px 12px;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .btn-delete {
-            background-color: var(--danger);
-            padding: 6px 12px;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            color: white;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .bg-cuti { background: #f39c12; }
-        .bg-mc { background: #e74c3c; }
-        .bg-el { background: #9b59b6; }
-        .bg-mesyuarat { background: #2ecc71; }
-        .bg-lawatan { background: #3498db; }
-
-        .lokasi-text {
-            display: block;
-            font-size: 12px;
-            color: #666;
-            margin-top: 4px;
-            font-style: italic;
-        }
+        .btn-edit { background: var(--success); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .btn-delete { background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; color: white; font-weight: bold; text-transform: uppercase; }
+        .bg-cuti { background: #f39c12; } .bg-mc { background: #e74c3c; } .bg-el { background: #9b59b6; } .bg-mesyuarat { background: #2ecc71; } .bg-lawatan { background: #3498db; }
+        .lokasi-text { display: block; font-size: 12px; color: #666; font-style: italic; margin-top: 4px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 id="formTitle">Perekodan Pergerakan Pegawai</h2>
-    
+    <h2>Perekodan Pergerakan Pegawai (Cloud)</h2>
     <form id="movementForm">
         <input type="hidden" id="editId">
         <div class="form-group">
@@ -163,59 +186,27 @@
                 </select>
             </div>
         </div>
-
         <div class="form-group">
-            <div>
-                <label>Tujuan</label>
-                <select id="tujuan" onchange="toggleLokasi()" required>
-                    <option value="Cuti">Cuti</option>
-                    <option value="MC">MC</option>
-                    <option value="EL">EL</option>
-                    <option value="Mesyuarat">Mesyuarat</option>
-                    <option value="Lawatan">Lawatan</option>
-                </select>
-            </div>
-            <div>
-                <label>Tarikh Keluar</label>
-                <input type="date" id="tarikhKeluar" required>
-            </div>
+            <div><label>Tujuan</label><select id="tujuan" onchange="toggleLokasi()" required><option value="Cuti">Cuti</option><option value="MC">MC</option><option value="EL">EL</option><option value="Mesyuarat">Mesyuarat</option><option value="Lawatan">Lawatan</option></select></div>
+            <div><label>Tarikh Keluar</label><input type="date" id="tarikhKeluar" required></div>
         </div>
-
-        <div id="lokasiWrapper">
-            <label>Lokasi (Nama Tempat / Bilik Mesyuarat)</label>
-            <input type="text" id="lokasi" placeholder="Contoh: Bilik Mesyuarat Utama">
-        </div>
-
-        <div class="form-group">
-            <div style="grid-column: span 2;">
-                <label>Tempoh Pergerakan</label>
-                <input type="text" id="tempoh" placeholder="Cth: 1 hari, 2 jam, 1 minggu" required>
-            </div>
-        </div>
-
+        <div id="lokasiWrapper"><label>Lokasi</label><input type="text" id="lokasi" placeholder="Nama Tempat"></div>
+        <div class="form-group"><div style="grid-column: span 2;"><label>Tempoh</label><input type="text" id="tempoh" placeholder="Cth: 2 hari" required></div></div>
         <button type="submit" id="submitBtn" class="btn-main">Simpan Rekod Pergerakan</button>
-        <button type="button" id="cancelEditBtn" style="display:none; background:#95a5a6; margin-top:5px;" class="btn-main" onclick="cancelEdit()">Batal Kemaskini</button>
+        <button type="button" id="cancelEditBtn" style="display:none; background:#95a5a6;" class="btn-main">Batal Kemaskini</button>
     </form>
-
     <hr>
-
-    <h3>Ringkasan Pergerakan (Susunan Mengikut Nama)</h3>
+    <h3>Ringkasan Pergerakan</h3>
     <div style="overflow-x:auto;">
         <table>
-            <thead>
-                <tr>
-                    <th>Nama Pegawai & Unit</th>
-                    <th>Tujuan & Lokasi</th>
-                    <th>Tarikh & Tempoh</th>
-                    <th>Tindakan</th>
-                </tr>
-            </thead>
+            <thead><tr><th>Nama & Unit</th><th>Tujuan</th><th>Tarikh & Tempoh</th><th>Tindakan</th></tr></thead>
             <tbody id="tableBody"></tbody>
         </table>
     </div>
 </div>
 
 <script>
+    // Data Pegawai (Client-side Logic)
     const database = [
         { nama: "Ir. Yusri Bin Harun", unit: "Pengurusan Kejuruteraan" },
         { nama: "Rosidah Bt Hamzah", unit: "Pengurusan Kejuruteraan" },
@@ -242,170 +233,31 @@
         { nama: "Wan Muhammad Na'im bin Wan Kamaruddin", unit: "Unit Kawalselia Fasiliti Kesihatan" }
     ];
 
-    const form = document.getElementById('movementForm');
     const namaSelect = document.getElementById('namaSelect');
     const unitSelect = document.getElementById('unitSelect');
     const tujuanSelect = document.getElementById('tujuan');
     const lokasiWrapper = document.getElementById('lokasiWrapper');
-    const lokasiInput = document.getElementById('lokasi');
-    const tempohInput = document.getElementById('tempoh');
-    const submitBtn = document.getElementById('submitBtn');
-    const editIdInput = document.getElementById('editId');
-    const cancelEditBtn = document.getElementById('cancelEditBtn');
 
     function populateNama() {
         database.sort((a, b) => a.nama.localeCompare(b.nama)).forEach(staff => {
             let option = document.createElement('option');
-            option.value = staff.nama;
-            option.textContent = staff.nama;
+            option.value = staff.nama; option.textContent = staff.nama;
             namaSelect.appendChild(option);
         });
     }
 
-    function autoSelectUnit() {
-        const selectedStaff = database.find(s => s.nama === namaSelect.value);
-        if (selectedStaff) unitSelect.value = selectedStaff.unit;
-    }
+    window.autoSelectUnit = () => {
+        const selected = database.find(s => s.nama === namaSelect.value);
+        if (selected) unitSelect.value = selected.unit;
+    };
 
-    function toggleLokasi() {
-        if (tujuanSelect.value === "Mesyuarat" || tujuanSelect.value === "Lawatan") {
-            lokasiWrapper.style.display = "block";
-            lokasiInput.required = true;
-        } else {
-            lokasiWrapper.style.display = "none";
-            lokasiInput.required = false;
-            lokasiInput.value = "";
-        }
-    }
-
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        let records = JSON.parse(localStorage.getItem('pergerakan')) || [];
-        
-        const recordData = {
-            id: editIdInput.value ? parseInt(editIdInput.value) : Date.now(),
-            nama: namaSelect.value,
-            unit: unitSelect.value,
-            tujuan: tujuanSelect.value,
-            lokasi: lokasiInput.value,
-            keluar: document.getElementById('tarikhKeluar').value,
-            tempoh: tempohInput.value
-        };
-
-        if (editIdInput.value) {
-            const index = records.findIndex(r => r.id === recordData.id);
-            records[index] = recordData;
-            alert("Rekod telah dikemaskini!");
-        } else {
-            records.push(recordData);
-        }
-
-        localStorage.setItem('pergerakan', JSON.stringify(records));
-        cancelEdit();
-        displayRecords();
-    });
-
-    function displayRecords() {
-        let records = JSON.parse(localStorage.getItem('pergerakan')) || [];
-        const tableBody = document.getElementById('tableBody');
-        tableBody.innerHTML = '';
-
-        records.sort((a, b) => a.nama.localeCompare(b.nama) || new Date(a.keluar) - new Date(b.keluar));
-
-        records.forEach(rec => {
-            const infoLokasi = rec.lokasi ? `<span class="lokasi-text">📍 ${rec.lokasi}</span>` : '';
-            
-            tableBody.innerHTML += `
-                <tr>
-                    <td><strong>${rec.nama}</strong><br><small style="color:#666">${rec.unit}</small></td>
-                    <td><span class="badge bg-${rec.tujuan.toLowerCase()}">${rec.tujuan}</span>${infoLokasi}</td>
-                    <td>${formatDate(rec.keluar)} (${rec.tempoh})</td>
-                    <td>
-                        <div class="action-btns">
-                            <button class="btn-edit" onclick="editRecord(${rec.id})">Edit</button>
-                            <button class="btn-delete" onclick="deleteRecord(${rec.id})">Padam</button>
-                        </div>
-                    </td>
-                </tr>`;
-        });
-    }
-
-    function editRecord(id) {
-        let records = JSON.parse(localStorage.getItem('pergerakan')) || [];
-        const rec = records.find(r => r.id === id);
-        
-        if (rec) {
-            editIdInput.value = rec.id;
-            namaSelect.value = rec.nama;
-            unitSelect.value = rec.unit;
-            tujuanSelect.value = rec.tujuan;
-            toggleLokasi();
-            lokasiInput.value = rec.lokasi;
-            document.getElementById('tarikhKeluar').value = rec.keluar;
-            tempohInput.value = rec.tempoh;
-
-            submitBtn.textContent = "Kemaskini Rekod";
-            submitBtn.classList.add('btn-update');
-            cancelEditBtn.style.display = "block";
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    }
-
-    function cancelEdit() {
-        form.reset();
-        editIdInput.value = "";
-        submitBtn.textContent = "Simpan Rekod Pergerakan";
-        submitBtn.classList.remove('btn-update');
-        cancelEditBtn.style.display = "none";
-        toggleLokasi();
-    }
-
-    function deleteRecord(id) {
-        if(confirm('Padam rekod ini?')) {
-            let records = JSON.parse(localStorage.getItem('pergerakan')) || [];
-            localStorage.setItem('pergerakan', JSON.stringify(records.filter(r => r.id !== id)));
-            displayRecords();
-        }
-    }
-
-    function formatDate(dateString) {
-        if(!dateString) return "";
-        const [y, m, d] = dateString.split('-');
-        return `${d}/${m}/${y}`;
-    }
+    window.toggleLokasi = () => {
+        const show = (tujuanSelect.value === "Mesyuarat" || tujuanSelect.value === "Lawatan");
+        lokasiWrapper.style.display = show ? "block" : "none";
+        document.getElementById('lokasi').required = show;
+    };
 
     populateNama();
-    displayRecords();
-</script>
-<script type="module">
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyA3m4GL0Nke7spCwDm8GcZDo1yoYGLKbtc",
-  authDomain: "sistem-rekod-fail.firebaseapp.com",
-  projectId: "sistem-rekod-fail",
-  storageBucket: "sistem-rekod-fail.firebasestorage.app",
-  messagingSenderId: "543329165251",
-  appId: "1:543329165251:web:0bb357cc5a31e7065de776",
-  measurementId: "G-YBKTH94T4B"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-window.db = db;
-window.addDoc = addDoc;
-window.getDocs = getDocs;
-window.collection = collection;
-
 </script>
 </body>
 </html>

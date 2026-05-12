@@ -377,6 +377,35 @@
     populateNama();
     displayRecords();
 </script>
+<script type="module">
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA3m4GL0Nke7spCwDm8GcZDo1yoYGLKbtc",
+  authDomain: "sistem-rekod-fail.firebaseapp.com",
+  projectId: "sistem-rekod-fail",
+  storageBucket: "sistem-rekod-fail.firebasestorage.app",
+  messagingSenderId: "543329165251",
+  appId: "1:543329165251:web:0bb357cc5a31e7065de776",
+  measurementId: "G-YBKTH94T4B"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.db = db;
+window.addDoc = addDoc;
+window.getDocs = getDocs;
+window.collection = collection;
+
+</script>
 </body>
 </html>
